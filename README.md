@@ -1,2 +1,3 @@
-# onek1k_dea
+# OneK1K
+
 Characterization of transcriptional heterogeneity in OneK1K project
