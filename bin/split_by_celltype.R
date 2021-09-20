@@ -48,7 +48,7 @@ fin()
 #   ____________________________________________________________________________
 #   Export data                                                             ####
 
-iwalk(data, ~ saveRDS(.x, file = here(output, paste(.y, ".RDS"))))
+iwalk(data, ~ saveRDS(.x, file = here(output, paste0(.y, ".RDS"))))
 
 #   ____________________________________________________________________________
 #   Session info                                                            ####
