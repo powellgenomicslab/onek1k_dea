@@ -10,7 +10,7 @@
 
 # screen -S dea
 # qrsh -N dea -l mem_requested=150G -q short.q
-# conda activate r-4.1.0
+# conda activate r-4.1.1
 
 #   ____________________________________________________________________________
 #   Import libraries                                                        ####
@@ -24,17 +24,18 @@ library("SeuratDisk")
 #   ____________________________________________________________________________
 #   Set output                                                              ####
 
-output <- set_output("2021-09-13", "split-individual_celltype")
+output <- here("results", "2021-11-08_split-individual_celltype")
+dir.create(output)
 
 #   ____________________________________________________________________________
 #   Import data                                                             ####
 
 inicio("Read data")
 data <- LoadH5Seurat(here("..",
-                          "onek1k_azimuth", 
+                          "onek1k_scd", 
                           "results", 
-                          "2021-06-10_cell_annotation",
-                          "onek1k_seurat.h5seurat"), 
+                          "2021-10-30_aligned_data",
+                          "integrated.h5seurat"), 
                      assays = list(RNA = "counts"))
 Idents(data) <- "predicted.celltype.l2"
 fin()
@@ -49,10 +50,10 @@ setnames(covariates, "sampleid", "individual")
 md <- as.data.table(data[[]][, c("individual", "pool")])
 md <- unique(md)
 
-stopifnot(all(md$individual %in% covariates$individual) & 
-            all(covariates$individual %in% md$individual))
+stopifnot(all(md$individual %in% covariates$individual))
 
 sample_md <- merge(md, covariates, by = "individual")
+
 
 #   ____________________________________________________________________________
 #   Split data by individual and cell type                                  ####
@@ -87,7 +88,7 @@ sample_md_celltype <- lapply(sample_md_celltype, merge, sample_md, "individual")
 
 sample_md_celltype <- mapply(function(x, cell_type){
   x[, cell_type := ..cell_type]
-  x[, pair := paste(individual, ..cell_type, sep = "-")]
+  x[, pair := paste(..cell_type, individual, sep = "-")]
   merge(x, n, by = c("individual", "cell_type"))
 }, sample_md_celltype, names(sample_md_celltype), SIMPLIFY = FALSE)
 
@@ -110,7 +111,7 @@ stopifnot({all(mapply(function(metadata, exp){
 #   Rename individuals by cell type                                         ####
 
 res <- mapply(function(x, cell_type){
-  colnames(x) <- paste(colnames(x), cell_type, sep = "-")
+  colnames(x) <- paste(cell_type, colnames(x), sep = "-")
   x
 }, res, names(res))
 
