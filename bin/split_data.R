@@ -87,7 +87,7 @@ sample_md_celltype <- lapply(sample_md_celltype, merge, md, "individual")
 # Add cell type label and number of cells per individual
 sample_md_celltype <- mapply(function(x, cell_type){
   x[, cell_type := ..cell_type]
-  x[, pair := paste(..cell_type, individual, sep = "-")]
+  x[, id := paste(..cell_type, individual, sep = ".")]
   merge(x, n, by = c("individual", "cell_type"))
 }, sample_md_celltype, names(sample_md_celltype), SIMPLIFY = FALSE)
 
