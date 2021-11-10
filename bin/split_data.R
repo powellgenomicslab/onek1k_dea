@@ -8,8 +8,8 @@
 #   ____________________________________________________________________________
 #   HPC details                                                             ####
 
-# screen -S dea
-# qrsh -N dea -l mem_requested=150G -q short.q
+# screen -S pbulk
+# qrsh -N pbulk -l mem_requested=150G -q short.q
 # conda activate r-4.1.1
 
 #   ____________________________________________________________________________
@@ -18,42 +18,34 @@
 library("dsLib")
 library("data.table")
 library("Seurat")
-library("SeuratExtra")
 library("SeuratDisk")
+library("popdea")
 
 #   ____________________________________________________________________________
 #   Set output                                                              ####
 
-output <- here("results", "2021-11-08_split-individual_celltype")
+output <- here("results", "2021-11-10_create_pseudobulk")
 dir.create(output)
 
 #   ____________________________________________________________________________
 #   Import data                                                             ####
 
 inicio("Read data")
-data <- LoadH5Seurat(here("..",
-                          "onek1k_scd", 
-                          "results", 
-                          "2021-10-30_aligned_data",
-                          "integrated.h5seurat"), 
+data <- LoadH5Seurat(here("..", "onek1k_scd", "results", 
+                          "2021-11-10_add_metadata", "onek1k.h5seurat"), 
                      assays = list(RNA = "counts"))
 Idents(data) <- "predicted.celltype.l2"
 fin()
 
 
-covariates <- fread(here("data", "age_sex_info.tsv"))
-setnames(covariates, "sampleid", "individual")
+# Get European only
+data <- data[, !data$ethnic_outlier]
 
 #   ____________________________________________________________________________
 #   Create sample metadata                                                  ####
 
-md <- as.data.table(data[[]][, c("individual", "pool")])
+md <- as.data.table(data[[]][, c("individual", "pool", "age", "sex")])
 md <- unique(md)
-
-stopifnot(all(md$individual %in% covariates$individual))
-
-sample_md <- merge(md, covariates, by = "individual")
-
 
 #   ____________________________________________________________________________
 #   Split data by individual and cell type                                  ####
@@ -75,17 +67,24 @@ res <- reduce_matrix(groups)
 #   ____________________________________________________________________________
 #   Create metadata for each cell type                                      ####
 
+# Get number of cells per individual across each cell ty[e]
 n <- as.data.table(data[[]][, c("individual", "predicted.celltype.l2")])
 n <- n[,.N, .(individual, predicted.celltype.l2)]
 setnames(n, "predicted.celltype.l2", "cell_type")
 
+# Retrieve individual ids present in each cell type
 sample_md_celltype <- lapply(res, colnames)
+
+# Create metadata template with individual ides for each cell type
 sample_md_celltype <- lapply(sample_md_celltype, function(x){ 
   x <- as.data.table(x)
   setnames(x, "individual")
   })
-sample_md_celltype <- lapply(sample_md_celltype, merge, sample_md, "individual")
 
+# Merge individual-level metadata with cell-type individual templates
+sample_md_celltype <- lapply(sample_md_celltype, merge, md, "individual")
+
+# Add cell type label and number of cells per individual
 sample_md_celltype <- mapply(function(x, cell_type){
   x[, cell_type := ..cell_type]
   x[, pair := paste(..cell_type, individual, sep = "-")]
@@ -111,14 +110,14 @@ stopifnot({all(mapply(function(metadata, exp){
 #   Rename individuals by cell type                                         ####
 
 res <- mapply(function(x, cell_type){
-  colnames(x) <- paste(cell_type, colnames(x), sep = "-")
+  colnames(x) <- paste(cell_type, colnames(x), sep = ".")
   x
 }, res, names(res))
 
 #   ____________________________________________________________________________
 #   Export data                                                             ####
 
-fwrite(sample_md, here(output, "sample_metadata.csv"))
+fwrite(md, here(output, "sample_metadata.csv"))
 saveRDS(sample_md_celltype, here(output, "sample-celltype_metadata.RDS"))
 saveRDS(res, here(output, "expression_sample-celltype.RDS"))
 
